@@ -5,6 +5,7 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 /**
  * @title DSCEngine
@@ -34,6 +35,9 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFactorNotImproved();
+
+    // Types
+    using OracleLib for AggregatorV3Interface;
 
     // State Variables
     uint256 private constant ADDITIONAL_FEED_PRCEISION = 1e10;
@@ -157,7 +161,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param amountDscToBurn The amount of DSC to burn
      * This function burns DSC and redeems underlying collateral in one transaction
      */
-    function reddemCollateralForDsc(
+    function redeemCollateralForDsc(
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountDscToBurn
@@ -343,7 +347,7 @@ contract DSCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(
             s_priceFeeds[token]
         );
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (, int256 price, , , ) = priceFeed.staleCheckLatestRoundData();
         return
             (usdAmountInWei * PRCEISION) /
             (uint256(price) * ADDITIONAL_FEED_PRCEISION);
@@ -368,7 +372,7 @@ contract DSCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(
             s_priceFeeds[token]
         );
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (, int256 price, , , ) = priceFeed.staleCheckLatestRoundData();
 
         return
             ((uint256(price) * ADDITIONAL_FEED_PRCEISION) * amount) / PRCEISION;
@@ -386,5 +390,22 @@ contract DSCEngine is ReentrancyGuard {
 
     function getHealthFactor(address user) external view returns (uint256) {
         return _healthFactor(user);
+    }
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getCollateralBalanceOfUser(
+        address user,
+        address token
+    ) external view returns (uint256) {
+        return s_collateralDeposited[user][token];
+    }
+
+    function getCollateralTokenPriceFeed(
+        address token
+    ) external view returns (address) {
+        return s_priceFeeds[token];
     }
 }
